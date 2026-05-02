@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["programs/falcon-auth", "programs/example-consumer"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+solana-falcon512 = { path = "../solana-falcon512" }
+solana-program = "3.0.0"
+solana-program-error = "3.0.1"
+solana-system-interface = { version = "2.0.0", features = ["bincode"] }
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
