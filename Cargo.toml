@@ -13,6 +13,5 @@ solana-program-error = "3.0.1"
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
 
 [profile.release]
-overflow-checks = true
 lto = "fat"
 codegen-units = 1

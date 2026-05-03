@@ -9,7 +9,7 @@ Solana program for **Falcon-512 application authorization**.
 - Monotonic nonce replay protection; pending key accounts cannot verify actions.
 - Authority-controlled key rotation and close.
 - Example consumer program proves CPI-gated state mutation.
-- Current SBF measurements: `verify_action` **322,965 CU**, consumer CPI increment **326,169 CU**.
+- Current SBF measurements: `verify_action` **193,588 CU**, consumer CPI increment **196,928 CU**.
 
 This does **not** replace Solana transaction signatures. It is an app-level authorization layer.
 
@@ -75,13 +75,3 @@ cargo-build-sbf --manifest-path programs/example-consumer/Cargo.toml
 cargo test --workspace
 cargo test-sbf
 ```
-
-Localnet smoke test:
-
-```sh
-FALCON_AUTH_RPC_URL=http://127.0.0.1:8899 \
-FALCON_AUTH_PROGRAM_ID=<falcon-auth-program> \
-EXAMPLE_CONSUMER_PROGRAM_ID=<example-consumer-program> \
-cargo test --workspace localnet_smoke_register_rotate_and_consumer_cpi -- --ignored --nocapture
-```
-

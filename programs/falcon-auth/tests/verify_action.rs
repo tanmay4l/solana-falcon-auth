@@ -20,7 +20,7 @@ const NEXT_NONCE_OFFSET: usize = 42;
 const PREPARED_PUBKEY_OFFSET: usize = 50;
 const FALCON_KEY_ACCOUNT_LEN: usize = PREPARED_PUBKEY_OFFSET + 1024;
 const FALCON_ACTION_PAYLOAD_LEN: usize = 193;
-const VERIFY_ACTION_MAX_CU: u64 = 400_000;
+const VERIFY_ACTION_MAX_CU: u64 = 225_000;
 
 struct Fixture {
     mollusk: Mollusk,
