@@ -25,9 +25,9 @@ pub const TAG_ROTATE_KEY: u8 = 2;
 pub const TAG_CLOSE_KEY: u8 = 3;
 pub const TAG_WRITE_KEY_CHUNK: u8 = 4;
 pub const TAG_FINALIZE_KEY: u8 = 5;
-pub const VERSION: u8 = 1;
+pub const VERSION: u8 = 2;
 pub const FALCON_KEY_SEED: &[u8] = b"falcon-key";
-pub const FALCON_KEY_DISCRIMINATOR: [u8; 8] = *b"FALKYA01";
+pub const FALCON_KEY_DISCRIMINATOR: [u8; 8] = *b"FALKYA02";
 pub const CLOSED_DISCRIMINATOR: [u8; 8] = [0xff; 8];
 pub const FALCON_ACTION_MAGIC: [u8; 16] = *b"SOL_FALCON_ACT1!";
 pub const PENDING_NONCE: u64 = u64::MAX;
@@ -35,12 +35,14 @@ pub const PENDING_NONCE: u64 = u64::MAX;
 pub const DISCRIMINATOR_OFFSET: usize = 0;
 pub const VERSION_OFFSET: usize = 8;
 pub const BUMP_OFFSET: usize = 9;
-pub const AUTHORITY_OFFSET: usize = 10;
-pub const NEXT_NONCE_OFFSET: usize = 42;
-pub const PREPARED_PUBKEY_OFFSET: usize = 50;
+pub const CLUSTER_OFFSET: usize = 10;
+pub const RESERVED_OFFSET: usize = 11;
+pub const AUTHORITY_OFFSET: usize = 12;
+pub const NEXT_NONCE_OFFSET: usize = 44;
+pub const PREPARED_PUBKEY_OFFSET: usize = 52;
 pub const FALCON_KEY_ACCOUNT_LEN: usize = PREPARED_PUBKEY_OFFSET + FALCON_512_PREPARED_PUBKEY_LEN;
 
-const REGISTER_KEY_DATA_LEN: usize = 1 + 1;
+const REGISTER_KEY_DATA_LEN: usize = 1 + 1 + 1;
 const VERIFY_ACTION_DATA_LEN: usize = 1 + 1 + 8 + 8 + 32 + 32 + FALCON_512_SIGNATURE_LEN;
 const ROTATE_KEY_DATA_LEN: usize = 1;
 const FALCON_ACTION_PAYLOAD_LEN: usize = 16 + 1 + 32 + 32 + 32 + 8 + 8 + 32 + 32;
@@ -59,6 +61,7 @@ pub enum FalconAuthError {
     ExpiredAction = 10,
     ArithmeticOverflow = 11,
     AccountClosed = 12,
+    ClusterMismatch = 13,
 }
 
 impl From<FalconAuthError> for ProgramError {
@@ -98,12 +101,8 @@ fn process_register_key(
         return Err(FalconAuthError::InvalidInstructionData.into());
     }
 
-    let (&bump, extra) = data
-        .split_first()
-        .ok_or(FalconAuthError::InvalidInstructionData)?;
-    if !extra.is_empty() {
-        return Err(FalconAuthError::InvalidInstructionData.into());
-    }
+    let bump = data[0];
+    let cluster = data[1];
 
     let account_iter = &mut accounts.iter();
     let authority = next_account_info(account_iter)?;
@@ -166,7 +165,7 @@ fn process_register_key(
     )?;
 
     let mut account_data = falcon_key.try_borrow_mut_data()?;
-    write_pending_falcon_key_account(&mut account_data, bump, authority.key.as_ref())
+    write_pending_falcon_key_account(&mut account_data, bump, cluster, authority.key.as_ref())
 }
 
 fn is_valid_prepared_pubkey(bytes: &[u8]) -> bool {
@@ -215,6 +214,9 @@ fn process_verify_action(
 
     let mut account_data = falcon_key.try_borrow_mut_data()?;
     validate_falcon_key_account(program_id, authority.key, falcon_key.key, &account_data)?;
+    if account_data[CLUSTER_OFFSET] != cluster {
+        return Err(FalconAuthError::ClusterMismatch.into());
+    }
 
     let stored_nonce = read_u64(&account_data, NEXT_NONCE_OFFSET)?;
     if stored_nonce == PENDING_NONCE {
@@ -442,6 +444,9 @@ fn validate_falcon_key_account(
     if data[VERSION_OFFSET] != VERSION {
         return Err(FalconAuthError::InvalidAccountData.into());
     }
+    if data[RESERVED_OFFSET] != 0 {
+        return Err(FalconAuthError::InvalidAccountData.into());
+    }
     if &data[AUTHORITY_OFFSET..NEXT_NONCE_OFFSET] != authority.as_ref() {
         return Err(FalconAuthError::InvalidAccountData.into());
     }
@@ -498,6 +503,7 @@ fn read_array<const N: usize>(data: &[u8], offset: usize) -> Result<&[u8; N], Pr
 fn write_pending_falcon_key_account(
     account_data: &mut [u8],
     bump: u8,
+    cluster: u8,
     authority: &[u8],
 ) -> ProgramResult {
     if account_data.len() != FALCON_KEY_ACCOUNT_LEN || authority.len() != 32 {
@@ -507,6 +513,8 @@ fn write_pending_falcon_key_account(
     account_data[DISCRIMINATOR_OFFSET..VERSION_OFFSET].copy_from_slice(&FALCON_KEY_DISCRIMINATOR);
     account_data[VERSION_OFFSET] = VERSION;
     account_data[BUMP_OFFSET] = bump;
+    account_data[CLUSTER_OFFSET] = cluster;
+    account_data[RESERVED_OFFSET] = 0;
     account_data[AUTHORITY_OFFSET..NEXT_NONCE_OFFSET].copy_from_slice(authority);
     account_data[NEXT_NONCE_OFFSET..PREPARED_PUBKEY_OFFSET]
         .copy_from_slice(&PENDING_NONCE.to_le_bytes());

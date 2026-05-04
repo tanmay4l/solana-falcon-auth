@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["programs/falcon-auth", "programs/example-consumer"]
+members = ["programs/falcon-auth", "programs/falcon-vault"]
 
 [workspace.package]
 edition = "2024"

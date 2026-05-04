@@ -5,11 +5,11 @@ Solana program for **Falcon-512 application authorization**.
 - Stores one prepared Falcon-512 pubkey per Solana authority in a PDA.
 - Verifies 666-byte Falcon signatures with `solana-falcon512`.
 - Chunked 1024-byte prepared-pubkey writes (`register/rotate -> write chunks -> finalize`) to stay under Solana's transaction packet limit.
-- Canonical signed payload binds cluster, auth program id, authority, Falcon key account, nonce, expiry slot, action domain, and action hash.
+- Canonical signed payload binds registered cluster/deployment domain, auth program id, authority, Falcon key account, nonce, expiry slot, action domain, and action hash.
 - Monotonic nonce replay protection; pending key accounts cannot verify actions.
 - Authority-controlled key rotation and close.
-- Example consumer program proves CPI-gated state mutation.
-- Current SBF measurements: `verify_action` **193,588 CU**, consumer CPI increment **196,928 CU**.
+- Falcon vault program proves CPI-gated SOL withdrawals.
+- Current SBF measurements: `verify_action` **~195k CU**, Falcon vault withdraw **~199k CU**.
 
 This does **not** replace Solana transaction signatures. It is an app-level authorization layer.
 
@@ -17,9 +17,11 @@ This does **not** replace Solana transaction signatures. It is an app-level auth
 
 ```text
 FalconKeyAccount
-  discriminator: [u8; 8] = b"FALKYA01"
+  discriminator: [u8; 8] = b"FALKYA02"
   version: u8
   bump: u8
+  cluster: u8
+  reserved: u8       # keeps prepared_pubkey 2-byte aligned
   authority: [u8; 32]
   next_nonce: u64
   prepared_pubkey: [u8; 1024]
@@ -33,7 +35,7 @@ PDA seeds = [b"falcon-key", authority_pubkey.as_ref()]
 
 | Tag | Instruction       | Purpose                                      |
 | --- | ----------------- | -------------------------------------------- |
-| 0   | `register_key`    | Create Falcon key PDA in pending state.      |
+| 0   | `register_key`    | Create Falcon key PDA with cluster binding.  |
 | 1   | `verify_action`   | Verify Falcon signature and increment nonce. |
 | 2   | `rotate_key`      | Reset active key account to pending state.   |
 | 3   | `close_key`       | Close key account back to authority.         |
@@ -57,12 +59,12 @@ FalconActionV1
   action_hash: [u8; 32]
 ```
 
-The auth program verifies this payload and advances the nonce. It does not parse application-specific action data.
+The auth program checks `cluster` against the value stored at registration, verifies this payload, and advances the nonce. It does not parse application-specific action data.
 
 ## Project layout
 
 - `programs/falcon-auth/` — core auth program.
-- `programs/example-consumer/` — minimal CPI consumer program.
+- `programs/falcon-vault/` — SOL vault gated by Falcon auth CPI.
 - `programs/falcon-auth/tests/` — Mollusk/SBF tests.
 
 ## Testing
@@ -71,7 +73,7 @@ The auth program verifies this payload and advances the nonce. It does not parse
 cargo fmt --check
 cargo clippy --workspace -- -D warnings
 cargo-build-sbf --manifest-path programs/falcon-auth/Cargo.toml
-cargo-build-sbf --manifest-path programs/example-consumer/Cargo.toml
+cargo-build-sbf --manifest-path programs/falcon-vault/Cargo.toml
 cargo test --workspace
 cargo test-sbf
 ```

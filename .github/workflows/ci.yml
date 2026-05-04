@@ -32,11 +32,10 @@ jobs:
       - name: Build SBF
         run: |
           cargo-build-sbf --manifest-path programs/falcon-auth/Cargo.toml
-          cargo-build-sbf --manifest-path programs/example-consumer/Cargo.toml
+          cargo-build-sbf --manifest-path programs/falcon-vault/Cargo.toml
 
       - name: Test
         run: cargo test --workspace
 
       - name: SBF tests
         run: cargo test-sbf
-        working-directory: programs/falcon-auth

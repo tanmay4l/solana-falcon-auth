@@ -18,17 +18,20 @@ const TAG_CLOSE_KEY: u8 = 3;
 const TAG_WRITE_KEY_CHUNK: u8 = 4;
 const TAG_FINALIZE_KEY: u8 = 5;
 const FALCON_KEY_SEED: &[u8] = b"falcon-key";
-const FALCON_KEY_DISCRIMINATOR: [u8; 8] = *b"FALKYA01";
+const FALCON_KEY_DISCRIMINATOR: [u8; 8] = *b"FALKYA02";
 const CLOSED_DISCRIMINATOR: [u8; 8] = [0xff; 8];
 const FALCON_ACTION_MAGIC: [u8; 16] = *b"SOL_FALCON_ACT1!";
 const PENDING_NONCE: u64 = u64::MAX;
 const VERSION_OFFSET: usize = 8;
 const BUMP_OFFSET: usize = 9;
-const AUTHORITY_OFFSET: usize = 10;
-const NEXT_NONCE_OFFSET: usize = 42;
-const PREPARED_PUBKEY_OFFSET: usize = 50;
+const CLUSTER_OFFSET: usize = 10;
+const RESERVED_OFFSET: usize = 11;
+const AUTHORITY_OFFSET: usize = 12;
+const NEXT_NONCE_OFFSET: usize = 44;
+const PREPARED_PUBKEY_OFFSET: usize = 52;
 const FALCON_KEY_ACCOUNT_LEN: usize = PREPARED_PUBKEY_OFFSET + 1024;
 const FALCON_ACTION_PAYLOAD_LEN: usize = 193;
+const CLUSTER: u8 = 0;
 
 struct Fixture {
     mollusk: Mollusk,
@@ -60,8 +63,10 @@ fn make_fixture(next_nonce: u64, prepared_pubkey: [u8; FALCON_512_PREPARED_PUBKE
     let lamports = mollusk.sysvars.rent.minimum_balance(FALCON_KEY_ACCOUNT_LEN);
     let mut data = vec![0u8; FALCON_KEY_ACCOUNT_LEN];
     data[..8].copy_from_slice(&FALCON_KEY_DISCRIMINATOR);
-    data[VERSION_OFFSET] = 1;
+    data[VERSION_OFFSET] = 2;
     data[BUMP_OFFSET] = bump;
+    data[CLUSTER_OFFSET] = CLUSTER;
+    data[RESERVED_OFFSET] = 0;
     data[AUTHORITY_OFFSET..NEXT_NONCE_OFFSET].copy_from_slice(authority.as_ref());
     data[NEXT_NONCE_OFFSET..PREPARED_PUBKEY_OFFSET].copy_from_slice(&next_nonce.to_le_bytes());
     data[PREPARED_PUBKEY_OFFSET..].copy_from_slice(&prepared_pubkey);
@@ -144,7 +149,7 @@ fn build_payload(
     let action_hash = [9u8; 32];
     let mut out = [0u8; FALCON_ACTION_PAYLOAD_LEN];
     out[0..16].copy_from_slice(&FALCON_ACTION_MAGIC);
-    out[16] = 0;
+    out[16] = CLUSTER;
     out[17..49].copy_from_slice(program_id.as_ref());
     out[49..81].copy_from_slice(authority.as_ref());
     out[81..113].copy_from_slice(falcon_key.as_ref());
@@ -168,7 +173,7 @@ fn verify_ix(fixture: &Fixture, secret_key: &falcon512::SecretKey, nonce: u64) -
 
     let mut data = Vec::with_capacity(1 + 1 + 8 + 8 + 32 + 32 + FALCON_512_SIGNATURE_LEN);
     data.push(TAG_VERIFY_ACTION);
-    data.push(0);
+    data.push(CLUSTER);
     data.extend_from_slice(&nonce.to_le_bytes());
     data.extend_from_slice(&100u64.to_le_bytes());
     data.extend_from_slice(&[7u8; 32]);

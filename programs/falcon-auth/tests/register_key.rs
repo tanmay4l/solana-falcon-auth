@@ -15,14 +15,17 @@ const TAG_REGISTER_KEY: u8 = 0;
 const TAG_WRITE_KEY_CHUNK: u8 = 4;
 const TAG_FINALIZE_KEY: u8 = 5;
 const FALCON_KEY_SEED: &[u8] = b"falcon-key";
-const FALCON_KEY_DISCRIMINATOR: [u8; 8] = *b"FALKYA01";
+const FALCON_KEY_DISCRIMINATOR: [u8; 8] = *b"FALKYA02";
 const PENDING_NONCE: u64 = u64::MAX;
 const VERSION_OFFSET: usize = 8;
 const BUMP_OFFSET: usize = 9;
-const AUTHORITY_OFFSET: usize = 10;
-const NEXT_NONCE_OFFSET: usize = 42;
-const PREPARED_PUBKEY_OFFSET: usize = 50;
+const CLUSTER_OFFSET: usize = 10;
+const RESERVED_OFFSET: usize = 11;
+const AUTHORITY_OFFSET: usize = 12;
+const NEXT_NONCE_OFFSET: usize = 44;
+const PREPARED_PUBKEY_OFFSET: usize = 52;
 const FALCON_KEY_ACCOUNT_LEN: usize = PREPARED_PUBKEY_OFFSET + 1024;
+const CLUSTER: u8 = 0;
 
 fn make_mollusk() -> (Mollusk, Pubkey) {
     let program_id = Pubkey::new_unique();
@@ -43,7 +46,7 @@ fn prepared_pubkey_bytes() -> [u8; FALCON_512_PREPARED_PUBKEY_LEN] {
 fn register_ix(program_id: Pubkey, authority: Pubkey, falcon_key: Pubkey, bump: u8) -> Instruction {
     Instruction::new_with_bytes(
         program_id,
-        &[TAG_REGISTER_KEY, bump],
+        &[TAG_REGISTER_KEY, bump, CLUSTER],
         vec![
             AccountMeta::new(authority, true),
             AccountMeta::new(falcon_key, false),
@@ -223,8 +226,10 @@ fn register_key_stores_prepared_pubkey_state() {
     assert_eq!(account.owner, program_id);
     assert_eq!(account.data.len(), FALCON_KEY_ACCOUNT_LEN);
     assert_eq!(&account.data[..8], &FALCON_KEY_DISCRIMINATOR);
-    assert_eq!(account.data[VERSION_OFFSET], 1);
+    assert_eq!(account.data[VERSION_OFFSET], 2);
     assert_eq!(account.data[BUMP_OFFSET], bump);
+    assert_eq!(account.data[CLUSTER_OFFSET], CLUSTER);
+    assert_eq!(account.data[RESERVED_OFFSET], 0);
     assert_eq!(
         &account.data[AUTHORITY_OFFSET..NEXT_NONCE_OFFSET],
         authority.as_ref()
@@ -265,6 +270,37 @@ fn register_key_requires_authority_signature() {
     assert_eq!(
         result.program_result,
         SvmResult::Failure(ProgramError::MissingRequiredSignature)
+    );
+}
+
+#[test]
+fn register_key_rejects_missing_cluster() {
+    let (mollusk, program_id) = make_mollusk();
+    let authority = Pubkey::new_unique();
+    let (falcon_key, bump) =
+        Pubkey::find_program_address(&[FALCON_KEY_SEED, authority.as_ref()], &program_id);
+    let ix = Instruction::new_with_bytes(
+        program_id,
+        &[TAG_REGISTER_KEY, bump],
+        vec![
+            AccountMeta::new(authority, true),
+            AccountMeta::new(falcon_key, false),
+            AccountMeta::new_readonly(solana_sdk_ids::system_program::id(), false),
+        ],
+    );
+
+    let result = mollusk.process_instruction(
+        &ix,
+        &[
+            (authority, system_account(1_000_000_000)),
+            (falcon_key, system_account(0)),
+            keyed_account_for_system_program(),
+        ],
+    );
+
+    assert_eq!(
+        result.program_result,
+        SvmResult::Failure(ProgramError::Custom(1))
     );
 }
 
