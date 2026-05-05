@@ -9,9 +9,14 @@ Solana program for **Falcon-512 application authorization**.
 - Monotonic nonce replay protection; pending key accounts cannot verify actions.
 - Authority-controlled key rotation and close.
 - Falcon vault program proves CPI-gated SOL withdrawals.
-- Current SBF measurements: `verify_action` **~195k CU**, Falcon vault withdraw **~199k CU**.
+- PQ quorum program proves Falcon + Winternitz approval for the same app action.
+- 2-of-3 quorum paths add ML-DSA-44: Falcon + Winternitz, Falcon + ML-DSA, and Winternitz + ML-DSA.
+- Chunked Winternitz and prepared ML-DSA buffers keep large signatures/pubkeys out of instruction data.
+- Split ML-DSA proof PDAs move the four heavy matrix rows into separate row-proof transactions, then final quorum verification checks the completed proof.
+- Current SBF measurements: `verify_action` **~183k CU**, Falcon vault withdraw **~201k CU**.
 
 This does **not** replace Solana transaction signatures. It is an app-level authorization layer.
+The Falcon + Winternitz quorum path consumes each Winternitz root once and rotates to the next signed root. It uses a base-16 Winternitz checksum verifier with a 2,144-byte signature buffer and measures about **~298k CU** in SBF tests with a signature buffer. The split-proof ML-DSA paths fit the devnet/mainnet transaction cap: ML-DSA challenge prep is about **~55k CU**, each ML-DSA z-column prep is about **~59k CU**, each matrix-column proof is about **~91k CU**, each row finalize is about **~61k CU**, final Falcon + ML-DSA proof verification is about **~335k CU**, and final Winternitz + ML-DSA proof verification is about **~249k CU** in SBF tests.
 
 ## Program model
 
@@ -65,7 +70,9 @@ The auth program checks `cluster` against the value stored at registration, veri
 
 - `programs/falcon-auth/` — core auth program.
 - `programs/falcon-vault/` — SOL vault gated by Falcon auth CPI.
+- `programs/pq-quorum-auth/` — Falcon, Winternitz, and ML-DSA quorum auth.
 - `programs/falcon-auth/tests/` — Mollusk/SBF tests.
+- `programs/pq-quorum-auth/tests/` — Mollusk/SBF quorum tests.
 
 ## Testing
 
@@ -74,6 +81,7 @@ cargo fmt --check
 cargo clippy --workspace -- -D warnings
 cargo-build-sbf --manifest-path programs/falcon-auth/Cargo.toml
 cargo-build-sbf --manifest-path programs/falcon-vault/Cargo.toml
+cargo-build-sbf --manifest-path programs/pq-quorum-auth/Cargo.toml
 cargo test --workspace
 cargo test-sbf
 ```

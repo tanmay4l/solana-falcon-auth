@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["programs/falcon-auth", "programs/falcon-vault"]
+members = [
+    "programs/falcon-auth",
+    "programs/falcon-vault",
+    "programs/pq-quorum-auth",
+]
 
 [workspace.package]
 edition = "2024"
@@ -8,6 +12,7 @@ license = "MIT"
 
 [workspace.dependencies]
 solana-falcon512 = { git = "https://github.com/blueshift-gg/solana-falcon512.git", rev = "1a4387036dbe6abab8063c1e19d3a5826a7d9104" }
+solana-nostd-keccak = "0.1.3"
 solana-program = "3.0.0"
 solana-program-error = "3.0.1"
 solana-system-interface = { version = "2.0.0", features = ["bincode"] }
