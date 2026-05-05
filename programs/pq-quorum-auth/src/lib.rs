@@ -1586,12 +1586,10 @@ fn wots16_digits(message: &[u8]) -> [u8; WOTS16_LEN] {
 fn wots16_chain(start: &[u8; WOTS16_N], chain_index: u8, start_step: u8, steps: u8) -> [u8; 32] {
     let mut value = *start;
     let index_bytes = [chain_index];
-    let mut step = start_step;
 
-    for _ in 0..steps {
+    for (step, _) in (start_step..).zip(0..steps) {
         let step_bytes = [step];
         value = keccak_hashv(&[b"pq-wots16-chain-v1", &index_bytes, &step_bytes, &value]);
-        step += 1;
     }
 
     value
