@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "programs/falcon-auth",
     "programs/falcon-vault",
+    "programs/pq-smart-account",
     "programs/pq-quorum-auth",
 ]
 

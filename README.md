@@ -11,12 +11,13 @@ Solana program for **Falcon-512 application authorization**.
 - Falcon vault program proves CPI-gated SOL withdrawals.
 - PQ quorum program proves Falcon + Winternitz approval for the same app action.
 - 2-of-3 quorum paths add ML-DSA-44: Falcon + Winternitz, Falcon + ML-DSA, and Winternitz + ML-DSA.
-- Chunked Winternitz and prepared ML-DSA buffers keep large signatures/pubkeys out of instruction data.
+- Chunked Winternitz, Falcon-signature, and prepared ML-DSA buffers keep large signatures/pubkeys out of final instruction data.
 - Split ML-DSA proof PDAs move the four heavy matrix rows into separate row-proof transactions, then final quorum verification checks the completed proof.
-- Current SBF measurements: `verify_action` **~183k CU**, Falcon vault withdraw **~201k CU**.
+- PQ smart account program holds SOL and controls classic SPL token accounts through 2-of-3 PQ quorum auth over CPI.
+- Current SBF measurements: `verify_action` **~184k CU**, Falcon vault withdraw **~198k CU**.
 
 This does **not** replace Solana transaction signatures. It is an app-level authorization layer.
-The Falcon + Winternitz quorum path consumes each Winternitz root once and rotates to the next signed root. It uses a base-16 Winternitz checksum verifier with a 2,144-byte signature buffer and measures about **~298k CU** in SBF tests with a signature buffer. The split-proof ML-DSA paths fit the devnet/mainnet transaction cap: ML-DSA challenge prep is about **~55k CU**, each ML-DSA z-column prep is about **~59k CU**, each matrix-column proof is about **~91k CU**, each row finalize is about **~61k CU**, final Falcon + ML-DSA proof verification is about **~335k CU**, and final Winternitz + ML-DSA proof verification is about **~249k CU** in SBF tests.
+The Falcon + Winternitz quorum path consumes each Winternitz root once and rotates to the next signed root. It uses a base-16 Winternitz checksum verifier with a 2,144-byte signature buffer and measures about **~307k CU** in SBF tests. The PQ smart-account path measures about **~290k CU** for SOL, **~310k CU** for direct SPL, and **~318k CU** for buffered SPL in SBF tests. The ML-DSA proof setup is split into devnet-sized transactions: challenge prep is about **~51k CU**, each z-column prep is about **~55k CU**, each matrix-column proof is about **~87k CU**, and each row finalize is about **~57k CU**. Final smart-account SPL verification measures about **~356k CU** for buffered Falcon + ML-DSA and **~250k CU** for Winternitz + ML-DSA in SBF tests. Classic SPL token transfers are devnet-smoked for Falcon + Winternitz (**304,493 CU**), Falcon + ML-DSA (**346,713 CU**), and Winternitz + ML-DSA (**246,410 CU**).
 
 ## Program model
 
@@ -71,8 +72,10 @@ The auth program checks `cluster` against the value stored at registration, veri
 - `programs/falcon-auth/` — core auth program.
 - `programs/falcon-vault/` — SOL vault gated by Falcon auth CPI.
 - `programs/pq-quorum-auth/` — Falcon, Winternitz, and ML-DSA quorum auth.
+- `programs/pq-smart-account/` — SOL and classic SPL token smart account gated by PQ quorum auth CPI.
 - `programs/falcon-auth/tests/` — Mollusk/SBF tests.
 - `programs/pq-quorum-auth/tests/` — Mollusk/SBF quorum tests.
+- `programs/pq-smart-account/tests/` — Mollusk/SBF smart-account tests.
 
 ## Testing
 
@@ -82,6 +85,7 @@ cargo clippy --workspace -- -D warnings
 cargo-build-sbf --manifest-path programs/falcon-auth/Cargo.toml
 cargo-build-sbf --manifest-path programs/falcon-vault/Cargo.toml
 cargo-build-sbf --manifest-path programs/pq-quorum-auth/Cargo.toml
+cargo-build-sbf --manifest-path programs/pq-smart-account/Cargo.toml
 cargo test --workspace
 cargo test-sbf
 ```
