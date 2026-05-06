@@ -34,6 +34,7 @@ jobs:
           cargo-build-sbf --manifest-path programs/falcon-auth/Cargo.toml
           cargo-build-sbf --manifest-path programs/falcon-vault/Cargo.toml
           cargo-build-sbf --manifest-path programs/pq-quorum-auth/Cargo.toml
+          cargo-build-sbf --manifest-path programs/pq-smart-account/Cargo.toml
 
       - name: Test
         run: cargo test --workspace
