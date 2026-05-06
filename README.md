@@ -14,10 +14,11 @@ Solana program for **Falcon-512 application authorization**.
 - Chunked Winternitz, Falcon-signature, and prepared ML-DSA buffers keep large signatures/pubkeys out of final instruction data.
 - Split ML-DSA proof PDAs move the four heavy matrix rows into separate row-proof transactions, then final quorum verification checks the completed proof.
 - PQ smart account program holds SOL and controls classic SPL token accounts through 2-of-3 PQ quorum auth over CPI.
+- PQ migration registry lets a legacy Solana wallet bind itself to its PQ smart account for app-level discovery.
 - Current SBF measurements: `verify_action` **~184k CU**, Falcon vault withdraw **~198k CU**.
 
 This does **not** replace Solana transaction signatures. It is an app-level authorization layer.
-The Falcon + Winternitz quorum path consumes each Winternitz root once and rotates to the next signed root. It uses a base-16 Winternitz checksum verifier with a 2,144-byte signature buffer and measures about **~307k CU** in SBF tests. The PQ smart-account path measures about **~290k CU** for SOL, **~310k CU** for direct SPL, and **~318k CU** for buffered SPL in SBF tests. The ML-DSA proof setup is split into devnet-sized transactions: challenge prep is about **~51k CU**, each z-column prep is about **~55k CU**, each matrix-column proof is about **~87k CU**, and each row finalize is about **~57k CU**. Final smart-account SPL verification measures about **~356k CU** for buffered Falcon + ML-DSA and **~250k CU** for Winternitz + ML-DSA in SBF tests. Classic SPL token transfers are devnet-smoked for Falcon + Winternitz (**304,493 CU**), Falcon + ML-DSA (**346,713 CU**), and Winternitz + ML-DSA (**246,410 CU**).
+The Falcon + Winternitz quorum path consumes each Winternitz root once and rotates to the next signed root. It uses a base-16 Winternitz checksum verifier with a 2,144-byte signature buffer and measures about **~307k CU** in SBF tests. The PQ smart-account path measures about **~290k CU** for SOL, **~310k CU** for direct SPL, and **~318k CU** for buffered SPL in SBF tests. The ML-DSA proof setup is split into devnet-sized transactions: challenge prep is about **~51k CU**, each z-column prep is about **~55k CU**, each matrix-column proof is about **~87k CU**, and each row finalize is about **~57k CU**. Final smart-account SPL verification measures about **~356k CU** for buffered Falcon + ML-DSA and **~250k CU** for Winternitz + ML-DSA in SBF tests. Classic SPL token transfers are devnet-smoked for Falcon + Winternitz (**304,493 CU**), Falcon + ML-DSA (**346,713 CU**), and Winternitz + ML-DSA (**246,410 CU**). The migration registry bind instruction was devnet-smoked at **7,083 CU** for first bind and **4,721 CU** for rebind.
 
 ## Program model
 
@@ -36,6 +37,26 @@ FalconKeyAccount
 ```text
 PDA seeds = [b"falcon-key", authority_pubkey.as_ref()]
 ```
+
+## Migration registry
+
+```text
+RegistryAccount
+  discriminator: [u8; 8] = b"PQREG001"
+  version: u8
+  bump: u8
+  legacy_wallet: [u8; 32]
+  smart_program: [u8; 32]
+  smart_account: [u8; 32]
+  pq_quorum_program: [u8; 32]
+  quorum: [u8; 32]
+```
+
+```text
+PDA seeds = [b"pq-migrate", legacy_wallet.as_ref()]
+```
+
+The legacy wallet signs `bind`; the program verifies the smart-account owner, quorum owner, registry PDA, smart-account PDA, and stored smart-account authority/quorum fields before writing the mapping.
 
 ## Instructions
 
@@ -73,9 +94,11 @@ The auth program checks `cluster` against the value stored at registration, veri
 - `programs/falcon-vault/` — SOL vault gated by Falcon auth CPI.
 - `programs/pq-quorum-auth/` — Falcon, Winternitz, and ML-DSA quorum auth.
 - `programs/pq-smart-account/` — SOL and classic SPL token smart account gated by PQ quorum auth CPI.
+- `programs/pq-migration-registry/` — legacy wallet to PQ smart-account binding registry.
 - `programs/falcon-auth/tests/` — Mollusk/SBF tests.
 - `programs/pq-quorum-auth/tests/` — Mollusk/SBF quorum tests.
 - `programs/pq-smart-account/tests/` — Mollusk/SBF smart-account tests.
+- `programs/pq-migration-registry/tests/` — Mollusk/SBF registry tests.
 
 ## Testing
 
@@ -86,6 +109,7 @@ cargo-build-sbf --manifest-path programs/falcon-auth/Cargo.toml
 cargo-build-sbf --manifest-path programs/falcon-vault/Cargo.toml
 cargo-build-sbf --manifest-path programs/pq-quorum-auth/Cargo.toml
 cargo-build-sbf --manifest-path programs/pq-smart-account/Cargo.toml
+cargo-build-sbf --manifest-path programs/pq-migration-registry/Cargo.toml
 cargo test --workspace
 cargo test-sbf
 ```

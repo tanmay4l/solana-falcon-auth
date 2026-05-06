@@ -4,6 +4,7 @@ members = [
     "programs/falcon-auth",
     "programs/falcon-vault",
     "programs/pq-smart-account",
+    "programs/pq-migration-registry",
     "programs/pq-quorum-auth",
 ]
 

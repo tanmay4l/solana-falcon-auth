@@ -1,0 +1,29 @@
+[package]
+name = "pq-migration-registry"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+no-entrypoint = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+solana-program = { workspace = true }
+solana-system-interface = { workspace = true }
+
+[dev-dependencies]
+mollusk-svm = "0.12.0"
+solana-account = "3.4.0"
+solana-instruction = "3.4.0"
+solana-program-error.workspace = true
+solana-pubkey = "4.2.0"
+solana-sdk-ids = "3.1.0"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
